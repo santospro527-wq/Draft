@@ -1,293 +1,36 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>El Remate</title>
-<style>
-  :root{
-    --felt:#123128;
-    --felt-deep:#0c241c;
-    --felt-line: rgba(201,162,75,0.14);
-    --paper:#f4eed9;
-    --paper-dim:#e9dfc2;
-    --ink:#211c12;
-    --ink-soft:#5a5645;
-    --gold:#c9a24b;
-    --gold-bright:#e6c675;
-    --stamp:#9b2226;
-    --p1:#2f6f6a;
-    --p1-soft:#dcece9;
-    --p2:#a15c38;
-    --p2-soft:#f2e2d4;
-    --radius: 10px;
-    --shadow: 0 10px 30px rgba(0,0,0,0.35);
-    --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
-    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    font-family: var(--font-body);
-    color: var(--paper);
-    background:
-      radial-gradient(ellipse at top, rgba(201,162,75,0.08), transparent 55%),
-      repeating-linear-gradient(0deg, var(--felt-line) 0px, var(--felt-line) 1px, transparent 1px, transparent 44px),
-      repeating-linear-gradient(90deg, var(--felt-line) 0px, var(--felt-line) 1px, transparent 1px, transparent 44px),
-      linear-gradient(160deg, var(--felt), var(--felt-deep));
-    min-height:100vh;
-    padding: 28px 16px 60px;
-  }
-  .wrap{max-width: 920px; margin: 0 auto;}
-  .brand{ text-align:center; margin-bottom: 22px; }
-  .brand .eyebrow{
-    font-family: var(--font-mono);
-    letter-spacing: 0.35em;
-    font-size: 11px;
-    color: var(--gold-bright);
-    text-transform: uppercase;
-    opacity:0.85;
-  }
-  .brand h1{
-    font-family: var(--font-display);
-    font-size: clamp(34px, 6vw, 54px);
-    margin: 6px 0 4px;
-    color: var(--paper);
-    letter-spacing: 0.01em;
-  }
-  .brand .sub{ color: var(--gold-bright); opacity:0.75; font-size: 14px; }
-  .gavel{ width:34px; height:34px; display:inline-block; vertical-align:-8px; margin-right:6px;}
+<link rel="stylesheet" href="styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Arizonia&family=Roboto+Slab:wght@100..900&display=swap" rel="stylesheet">
+<title>Draft</title>
 
-  .card{
-    background: var(--paper);
-    color: var(--ink);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 22px;
-    border: 1px solid rgba(0,0,0,0.06);
-  }
-  .card + .card{ margin-top:16px; }
-
-  section h2{
-    font-family: var(--font-display);
-    font-size: 20px;
-    margin: 0 0 4px;
-    display:flex; align-items:baseline; gap:10px;
-  }
-  section h2 .n{
-    font-family: var(--font-mono);
-    font-size:12px;
-    color: var(--stamp);
-    border: 1px solid var(--stamp);
-    padding: 1px 6px;
-    border-radius: 3px;
-  }
-  .hint{ color: var(--ink-soft); font-size: 13px; margin: 4px 0 14px; line-height:1.5;}
-
-  .row{ display:flex; gap:14px; flex-wrap:wrap; }
-  .field{ flex:1 1 180px; }
-  .local-only{ display:none; }
-  label{ display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color: var(--ink-soft); margin-bottom:5px; font-weight:600;}
-  input[type=text], input[type=number], input[type=tel], textarea{
-    width:100%;
-    font-family: var(--font-body);
-    font-size:15px;
-    padding: 9px 11px;
-    border-radius:6px;
-    border:1.5px solid var(--paper-dim);
-    background: #fff;
-    color: var(--ink);
-  }
-  #p1name, #p2name, #hostName, #guestName{ font-size:18px; font-weight:700; padding:11px 12px; }
-  input:focus-visible, textarea:focus-visible, button:focus-visible, .cat:focus-visible{
-    outline: 2px solid var(--stamp);
-    outline-offset: 2px;
-  }
-  textarea{ resize: vertical; min-height:64px; font-family: var(--font-mono); font-size:13px;}
-
-  .cats{ display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:10px; margin-top: 8px;}
-  .cat{
-    border:1.5px solid var(--paper-dim);
-    border-radius:8px;
-    padding:10px 12px;
-    cursor:pointer;
-    background:#fff;
-    transition: border-color .15s, background .15s;
-  }
-  .cat.on{ border-color: var(--stamp); background: #fbeceb; }
-  .cat .cat-name{ font-weight:700; font-size:14px; }
-  .cat .cat-items{ font-size:11px; color: var(--ink-soft); margin-top:2px; line-height:1.4;}
-  .cat input{ display:none; }
-
-  .count-pill{ font-family: var(--font-mono); font-size:12px; color: var(--ink-soft); margin-top:10px; }
-
-  button{
-    font-family: var(--font-body);
-    font-weight:700;
-    font-size:15px;
-    border:none;
-    border-radius:7px;
-    padding: 12px 22px;
-    cursor:pointer;
-    transition: transform .1s ease, box-shadow .15s ease;
-  }
-  button:active{ transform: translateY(1px); }
-  .btn-gold{ background: linear-gradient(180deg, var(--gold-bright), var(--gold)); color: #2a1d05; box-shadow: 0 4px 0 #8a6a25;}
-  .btn-gold:active{ box-shadow: 0 2px 0 #8a6a25; }
-  .btn-ghost{ background: transparent; color: var(--ink); border: 1.5px solid var(--ink-soft); }
-  .btn-block{ width:100%; }
-  button:disabled{ opacity:0.45; cursor:not-allowed; }
-
-  .setup-actions{ text-align:center; margin-top: 22px; }
-  .error{ color: var(--stamp); font-size:13px; margin-top:8px; min-height:16px; }
-
-  /* ---- lobby / rooms ---- */
-  .lobby-choice{ display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-top:10px; }
-  .lobby-choice button{ flex:1 1 220px; }
-  .code-display{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size: clamp(38px,9vw,56px);
-    letter-spacing: 0.25em;
-    text-align:center;
-    color: var(--stamp);
-    background:#fff;
-    border:2px dashed var(--stamp);
-    border-radius:10px;
-    padding: 18px 10px;
-    margin: 10px 0 14px;
-  }
-  #codeInput{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size: 28px;
-    letter-spacing: 0.35em;
-    text-align:center;
-  }
-  .status-row{ display:flex; align-items:center; gap:8px; justify-content:center; font-size:13px; color:var(--ink-soft); margin-bottom:6px;}
-  .dot{ width:9px; height:9px; border-radius:50%; background:#c9c2a4; display:inline-block; }
-  .dot.on{ background:#2f6f6a; }
-  .waiting-pulse{ animation: pulse 1.4s ease-in-out infinite; }
-  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.4;} }
-
-  /* ---- draft screen ---- */
-  .table{ display:grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 14px; align-items:start; }
-  @media (max-width: 720px){ .table{ grid-template-columns: 1fr; } }
-  .ledger{ background: var(--paper); color: var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
-  .ledger.p1{ border-top: 5px solid var(--p1); }
-  .ledger.p2{ border-top: 5px solid var(--p2); }
-  .ledger .pname{ font-family: var(--font-display); font-size:clamp(25px,3vw,34px); line-height:1.05; font-weight:900; margin:0 0 10px; overflow-wrap:anywhere; }
-  .ledger.p1 .pname{ color:var(--p1); }
-  .ledger.p2 .pname{ color:var(--p2); }
-  .ledger .you-tag{ font-family: var(--font-mono); font-size:11px; color: var(--gold); background: var(--felt); display:inline-block; padding:1px 7px; border-radius:10px; margin-bottom:6px; }
-  .budget-label{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color: var(--ink-soft); }
-  .budget-amt{ font-family: var(--font-mono); font-size: 26px; font-weight:700; margin: 2px 0 8px; }
-  .meter{ height:8px; border-radius:5px; background: var(--paper-dim); overflow:hidden; margin-bottom:12px;}
-  .meter > div{ height:100%; border-radius:5px; transition: width .4s ease; }
-  .ledger.p1 .meter > div{ background: var(--p1); }
-  .ledger.p2 .meter > div{ background: var(--p2); }
-  .won-list{ list-style:none; margin:0; padding:0; font-size:13px; }
-  .won-list li{ display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom: 1px dashed var(--paper-dim);}
-  .won-list li:last-child{ border-bottom:none; }
-  .won-empty{ font-size:12px; color: var(--ink-soft); font-style:italic; }
-
-  .lot-wrap{ display:flex; flex-direction:column; gap:14px; }
-  .room-code-chip{
-    align-self:center;
-    font-family: var(--font-mono);
-    font-size:12px;
-    letter-spacing:0.15em;
-    color: var(--gold-bright);
-    border:1px solid var(--gold);
-    border-radius:14px;
-    padding:4px 12px;
-  }
-  .lot-card{ position:relative; background: var(--paper); color: var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px 20px; text-align:center; overflow:hidden; }
-  .lot-num{ font-family: var(--font-mono); font-size:12px; color: var(--stamp); letter-spacing:0.1em; }
-  .lot-cat{ font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color: var(--ink-soft); margin-top:2px;}
-  .lot-name{ font-family: var(--font-display); font-size: clamp(24px,4.5vw,32px); margin: 10px 0 4px; }
-  .progress-track{ height:5px; background: var(--felt-line); border-radius:4px; overflow:hidden; margin-top: 6px;}
-  .progress-fill{ height:100%; background: var(--gold); transition: width .3s ease; }
-
-  .turn-banner{
-    font-family: var(--font-mono);
-    font-size:18px;
-    font-weight:700;
-    text-align:center;
-    color: var(--gold-bright);
-    letter-spacing:0.04em;
-    background:rgba(12,36,28,0.72);
-    border:2px solid var(--gold);
-    border-radius:8px;
-    padding:12px 10px 14px;
-    box-shadow:0 5px 16px rgba(0,0,0,0.22);
-  }
-  .turn-banner strong{ display:block; font-family:var(--font-display); font-size:clamp(44px,7vw,64px); line-height:1; font-weight:900; letter-spacing:0; margin-top:7px; overflow-wrap:anywhere; }
-  .turn-banner strong.p1{ color:var(--p1); }
-  .turn-banner strong.p2{ color:var(--p2); }
-  .turn-banner .you-note{ display:block; font-size:12px; margin-top:6px; color: var(--gold-bright); opacity:0.8; }
-  .bid-box{ background: var(--paper); color: var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; }
-  .bid-row{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
-  .bid-row .field{ flex:1; }
-  .custom-bid-control{ flex:0 0 150px; }
-  .custom-bid-control label{ margin-bottom:5px; }
-  .custom-bid-control input{ box-sizing:border-box; min-height:44px; border-color:var(--gold); background:#fffdf7; font-family:var(--font-mono); font-weight:700; text-align:center; }
-  .btn-custom{ background:var(--p1-soft); color:var(--p1); border:1.5px solid var(--p1); }
-  .btn-custom:hover{ background:var(--p1); color:#fff; }
-  .status-chip{ font-size:12px; font-family: var(--font-mono); padding: 3px 9px; border-radius:20px; display:inline-block; margin-bottom:4px;}
-  .status-chip.wait{ background:#eee; color:#888; }
-  .status-chip.ready{ background: var(--p1-soft); color: var(--p1); }
-  .waiting-note{ text-align:center; font-size:13px; color:var(--ink-soft); font-family: var(--font-mono); }
-
-  .reveal-row{ display:flex; gap:14px; }
-  .reveal-side{ flex:1; border-radius:8px; padding: 14px; text-align:center; border: 1.5px solid var(--paper-dim); position:relative; overflow:hidden; }
-  .reveal-side.win{ border-color: var(--stamp); }
-  .reveal-amt{ font-family: var(--font-mono); font-size:26px; font-weight:700; margin-top:4px;}
-  .reveal-name{ font-family:var(--font-display); font-size:clamp(24px,4vw,34px); font-weight:900; line-height:1.05; overflow-wrap:anywhere; }
-  .stamp{ position:absolute; top:8px; right:8px; border:2.5px solid var(--stamp); color: var(--stamp); font-family: var(--font-mono); font-weight:700; font-size:11px; padding: 3px 7px; border-radius:4px; transform: rotate(-14deg) scale(0); animation: stampIn .35s ease-out .15s forwards; }
-  @keyframes stampIn{ 0%{ transform: rotate(-14deg) scale(2.2); opacity:0; } 60%{ transform: rotate(-14deg) scale(0.9); opacity:1; } 100%{ transform: rotate(-14deg) scale(1); opacity:1; } }
-  .unsold-note{ text-align:center; font-size:13px; color: var(--gold-bright); font-family: var(--font-mono); }
-
-  .end-list{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  @media (max-width:640px){ .end-list{ grid-template-columns:1fr; } }
-  .end-total{ font-family: var(--font-mono); font-size:14px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--paper-dim); }
-  .end-list .won-list li{ opacity:0; transform:translateY(10px); animation:lotReveal .45s ease-out forwards; }
-  @keyframes lotReveal{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
-
-  .screen{ display:none; }
-  .screen.active{ display:block; }
-
-  @media (prefers-reduced-motion: reduce){ *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
-</style>
 </head>
 <body>
 <div class="wrap">
 
   <div class="brand">
-    <div class="eyebrow">Casa de remates &bull; 2 jugadores &bull; online o local</div>
-    <h1>
-      <svg class="gavel" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="2" y="16.5" width="9" height="2.4" rx="1" transform="rotate(-40 2 16.5)" fill="#c9a24b"/>
-        <rect x="9.2" y="3" width="6.4" height="9.4" rx="1.3" transform="rotate(40 9.2 3)" fill="#e6c675"/>
-        <rect x="13" y="6.4" width="2" height="4.4" rx="1" transform="rotate(40 13 6.4)" fill="#9b2226"/>
-        <rect x="14" y="19" width="9" height="2.4" rx="1.2" fill="#e6c675"/>
-      </svg>
-      El Remate
-    </h1>
-    <div class="sub">Se puja de a $1: uno sube, el otro sube más, o le cede el lote.</div>
+    <div class="eyebrow">&bull; 2 jugadores &bull; online o local &bull;</div>
+    <div class="titulo">Draft</div>
+    <div class="sub">Pujá más o dejá a tu rival que se lo lleve.</div>
   </div>
 
   <!-- ============ LOBBY ============ -->
   <div class="screen active" id="screen-lobby">
     <div class="card">
       <section>
-        <h2>Elegí cómo jugar</h2>
-        <p class="hint">Podés jugar online con un código o compartir el dispositivo con otra persona.</p>
+        <h2>Elegí una opción:</h2>
+        <p class="hint">Podés jugar online con un código o jugar en el mismo dispositivo</p>
         <div class="lobby-choice">
-          <button class="btn-gold" id="goCreateBtn">Crear sala</button>
-          <button class="btn-ghost" id="goJoinBtn">Unirme con un código</button>
           <button class="btn-ghost" id="goLocalBtn">Jugar en este dispositivo</button>
+          <button class="btn-gold" id="goCreateBtn">Crear sala</button>
+          <button class="btn-ghost" id="goJoinBtn">Unirse a una sala</button>
+          
         </div>
         <div class="error" id="lobbyError"></div>
       </section>
@@ -301,11 +44,11 @@
         <h2><span class="n">01</span> Vos</h2>
         <div class="row">
           <div class="field">
-            <label for="hostName">Tu nombre</label>
+            <label for="hostName">Primer Jugador</label>
             <input type="text" id="hostName" value="Jugador 1" maxlength="20">
           </div>
           <div class="field local-only" id="localPlayerField">
-            <label for="localPlayerName">Nombre del otro jugador</label>
+            <label for="localPlayerName">Segundo Jugador</label>
             <input type="text" id="localPlayerName" value="Jugador 2" maxlength="20">
           </div>
           <div class="field" style="flex:0 0 140px;">
@@ -319,23 +62,23 @@
     <div class="card">
       <section>
         <h2><span class="n">02</span> Elegí los temas</h2>
-        <p class="hint">Tocá los temas que quieras incluir en el remate. Cuantos más elijas, más variedad de lotes.</p>
+        <p class="hint">Tocá los temas que quieras incluir en el draft. Cuantos más elijas, más variedad de objetos.</p>
         <div class="cats" id="cats"></div>
-        <div class="count-pill" id="poolCount">0 lotes disponibles</div>
+        <div class="count-pill" id="poolCount">0 objetos disponibles</div>
       </section>
     </div>
 
     <div class="card">
       <section>
         <h2><span class="n">03</span> Agregá los tuyos <span style="font-weight:400;color:var(--ink-soft);font-size:12px;">(opcional)</span></h2>
-        <p class="hint">Un objeto, lugar o cosa por línea. Se suman al resto de los lotes.</p>
+        <p class="hint">Un objeto, lugar o cosa separados con Enter. Se suman al resto de los objetos.</p>
         <textarea id="customItems" placeholder="Ej:&#10;Entradas al recital&#10;Un fin de semana en la playa&#10;La última porción de pizza"></textarea>
       </section>
     </div>
 
     <div class="card">
       <section>
-        <h2><span class="n">04</span> Cuántos lotes rematar</h2>
+        <h2><span class="n">04</span> Cuántos objetos rematar</h2>
         <p class="hint">Se eligen al azar del total de temas seleccionados. Tiene que ser un número par.</p>
         <div class="row">
           <div class="field" style="flex:0 0 160px;">
@@ -359,7 +102,7 @@
         <h2 style="font-family:var(--font-display);font-size:22px;">Compartí este código</h2>
         <p class="hint">Pasáselo al otro jugador para que se una a la sala.</p>
         <div class="code-display" id="hostCodeDisplay">0000</div>
-        <div class="status-row"><span class="dot" id="p2dot"></span><span id="p2statusText" class="waiting-pulse">Esperando a que se una el jugador 2&hellip;</span></div>
+        <div class="status-row"><span class="dot" id="p2dot"></span><span id="p2statusText" class="waiting-pulse">Esperando a que se una otro jugador&hellip;</span></div>
         <div class="setup-actions">
           <button class="btn-gold" id="startFromHostBtn" disabled>Comenzar remate</button>
           <button class="btn-ghost" id="cancelHostBtn">Cancelar sala</button>
@@ -416,7 +159,7 @@
         <div class="room-code-chip" id="draftCodeChip"></div>
         <button class="btn-ghost" id="leaveRoomBtn">Salir de la sala</button>
         <div class="lot-card">
-          <div class="lot-num" id="lotNum">LOTE 1 / 10</div>
+          <div class="lot-num" id="lotNum">Objeto 1 / 10</div>
           <div class="lot-cat" id="lotCat">Categoría</div>
           <div class="lot-name" id="lotName">Objeto</div>
           <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
@@ -435,8 +178,8 @@
   <div class="screen" id="screen-end">
     <div class="card">
       <section>
-        <h2 style="font-family:var(--font-display);font-size:26px;">Cierre del remate</h2>
-        <p class="hint">Esto fue lo que cada uno se llevó a casa.</p>
+        <h2 style="font-family:var(--font-display);font-size:26px;">Cierre de la ronda</h2>
+        <p class="hint">Esto fue lo que cada uno se llevó:</p>
         <div class="end-list" id="endList"></div>
       </section>
     </div>
@@ -695,7 +438,7 @@
 
   function updatePoolCount(){
     var pool = buildPool();
-    $("poolCount").textContent = pool.length + " lote" + (pool.length === 1 ? "" : "s") + " disponible" + (pool.length === 1 ? "" : "s");
+    $("poolCount").textContent = pool.length + " objeto" + (pool.length === 1 ? "" : "s") + " disponible" + (pool.length === 1 ? "" : "s");
   }
   $("customItems").addEventListener("input", updatePoolCount);
   renderCats();
@@ -710,9 +453,9 @@
     var pool = buildPool();
 
     if(!budget || budget <= 0){ err.textContent = "El presupuesto tiene que ser mayor a 0."; return; }
-    if(pool.length === 0){ err.textContent = "Elegí al menos un tema o agregá tus propios lotes."; return; }
-    if(!lotCount || lotCount < 2){ err.textContent = "La cantidad de lotes tiene que ser al menos 2."; return; }
-    if(lotCount % 2 !== 0){ err.textContent = "La cantidad de lotes tiene que ser par para repartirlos por igual."; return; }
+    if(pool.length === 0){ err.textContent = "Elegí al menos un tema o agregá tus propios objetos."; return; }
+    if(!lotCount || lotCount < 2){ err.textContent = "La cantidad de objetos tiene que ser al menos 2."; return; }
+    if(lotCount % 2 !== 0){ err.textContent = "La cantidad de objetos tiene que ser par para repartirlos por igual."; return; }
 
     var lots = [];
     while(lots.length < lotCount){ lots = lots.concat(shuffle(pool)); }
@@ -867,7 +610,7 @@
       ? '<ul class="won-list">' + p.won.map(function(w){
           return '<li><span>' + escapeHtml(w.name) + '</span><span>' + fmt(w.price) + '</span></li>';
         }).join("") + '</ul>'
-      : '<div class="won-empty">Todavía sin lotes</div>';
+      : '<div class="won-empty">Todavía sin objetos</div>';
 
     $("ledgerP" + (pi+1)).innerHTML =
       (pi === mySlot ? '<div class="you-tag">VOS</div>' : '') +
@@ -883,7 +626,7 @@
     renderLedger(1);
 
     var lot = currentLot();
-    $("lotNum").textContent = "LOTE " + (room.lotIndex + 1) + " / " + room.lots.length;
+    $("lotNum").textContent = "objeto " + (room.lotIndex + 1) + " / " + room.lots.length;
     $("lotCat").textContent = lot.cat;
     $("lotName").textContent = lot.name;
     $("progressFill").style.width = ((room.lotIndex / room.lots.length) * 100) + "%";
@@ -927,7 +670,7 @@
     var raiseLabel = "Pujar " + fmt(nextAmount);
     var cedeLabel = room.leader === null
       ? "Ceder el turno a " + escapeHtml(room.players[other].name)
-      : "Cederle el lote a " + escapeHtml(room.players[room.leader].name);
+      : "Cederle el objeto a " + escapeHtml(room.players[room.leader].name);
 
     var canCede = itsMyTurn && (room.leader !== null || reachedLotLimit);
 
@@ -949,7 +692,7 @@
 
     if(itsMyTurn && !canRaise){
       var raiseError = reachedLotLimit
-        ? p.name + ' ya tiene sus ' + maxLotsPerPlayer + ' lotes.'
+        ? p.name + ' ya tiene sus ' + maxLotsPerPlayer + ' objetos.'
         : p.name + ' no tiene fondos para subir la puja.';
       html += '<p class="error" style="text-align:center;">' + escapeHtml(raiseError) + '</p>';
     }
@@ -1029,7 +772,7 @@
 
     var html = "";
     if(room.resultWinner === null){
-      html += '<p class="unsold-note">Ninguno de los dos pujó &mdash; el lote queda sin rematar.</p>';
+      html += '<p class="unsold-note">Ninguno de los dos pujó &mdash; el objeto queda sin rematar.</p>';
     } else {
       var wp = room.players[room.resultWinner];
       html += '<div class="reveal-row"><div class="reveal-side win">' +
@@ -1041,7 +784,7 @@
     }
 
     html += '<div style="text-align:center;margin-top:14px;">' +
-      '<button class="btn-gold" id="nextLotBtn">' + (room.lotIndex + 1 < room.lots.length ? "Siguiente lote" : "Ver resultado final") + '</button>' +
+      '<button class="btn-gold" id="nextLotBtn">' + (room.lotIndex + 1 < room.lots.length ? "Siguiente objeto" : "Ver resultado final") + '</button>' +
       '</div>';
 
     $("bidBox").innerHTML = html;
@@ -1088,7 +831,7 @@
       value.updatedAt = Date.now();
       return value;
     }).catch(function(error){
-      console.error("No se pudo avanzar al siguiente lote:", error);
+      console.error("No se pudo avanzar al siguiente objeto:", error);
     });
   }
 
@@ -1103,7 +846,7 @@
             var delay = (revealIndex++ * 0.7).toFixed(2);
             return '<li style="animation-delay:' + delay + 's"><span>' + escapeHtml(w.name) + '</span><span>' + fmt(w.price) + '</span></li>';
           }).join("") + '</ul>'
-        : '<div class="won-empty">No se llevó ningún lote</div>';
+        : '<div class="won-empty">No se llevó ningún objeto</div>';
       html += '<div><p class="pname">' + escapeHtml(p.name) + '</p>' +
         wonHtml +
         '<div class="end-total">Gastado: ' + fmt(spent) + ' &nbsp;&bull;&nbsp; Le quedó: ' + fmt(p.budget) + '</div></div>';
