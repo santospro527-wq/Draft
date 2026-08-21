@@ -447,8 +447,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
-  import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
   // ⚠️ PEGÁ ACÁ LA CONFIG DE TU PROYECTO DE FIREBASE (Configuración del proyecto > Tus apps > SDK config)
  const firebaseConfig = {
   apiKey: "AIzaSyDqbfe_u9_EgA_8zmuqm_vZPI35IeVCV_w",
@@ -461,11 +459,10 @@ import { getAnalytics } from "firebase/analytics";
   measurementId: "G-P2N725R1CX"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
   firebase.initializeApp(firebaseConfig);
   var db = firebase.database();
+
+
 </script>
 
 <script>
