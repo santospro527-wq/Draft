@@ -554,7 +554,7 @@
         onRoomGone();
         return;
       }
-      room = val;
+      room = normalizeRoom(val);
       onRoomUpdate();
     }, function(err){
       console.error("Firebase error:", err);
@@ -567,7 +567,7 @@
   }
 
   function writeRoom(patch){
-    room = Object.assign({}, room, patch, { updatedAt: Date.now() });
+    room = normalizeRoom(Object.assign({}, room, patch, { updatedAt: Date.now() }));
     if(localMode){
       onRoomUpdate();
       return Promise.resolve();
@@ -575,6 +575,23 @@
     return db.ref("rooms/" + roomCode).set(room).catch(function(e){
       console.error("No se pudo guardar el estado:", e);
     });
+  }
+
+  function normalizeRoom(value){
+    if(!value || !value.players) return value;
+    value.players = listValue(value.players);
+    value.players = value.players.map(function(player){
+      if(!player) return null;
+      player.won = listValue(player.won);
+      return player;
+    });
+    return value;
+  }
+
+  function listValue(value){
+    if(Array.isArray(value)) return value;
+    if(!value || typeof value !== "object") return [];
+    return Object.keys(value).sort(function(a, b){ return Number(a) - Number(b); }).map(function(key){ return value[key]; });
   }
 
   function leaveRoom(){
@@ -607,7 +624,7 @@
     // La sala fue borrada (host canceló o expiró). Volvemos al inicio.
     clearSession();
     detachRoomListener();
-    roomCode = null; mySlot = null; room = null;
+    roomCode = null; mySlot = null; room = null; localMode = false;
     showScreen("lobby");
   }
 
@@ -619,6 +636,7 @@
     showScreen("create");
   });
   $("goJoinBtn").addEventListener("click", function(){
+    localMode = false;
     showScreen("join");
   });
   $("goLocalBtn").addEventListener("click", function(){
@@ -627,7 +645,10 @@
     $("createRoomBtn").textContent = "Comenzar partida local";
     showScreen("create");
   });
-  $("backFromCreateBtn").addEventListener("click", function(){ showScreen("lobby"); });
+  $("backFromCreateBtn").addEventListener("click", function(){
+    localMode = false;
+    showScreen("lobby");
+  });
   $("backFromJoinBtn").addEventListener("click", function(){ showScreen("lobby"); });
 
   // ---------- CREATE (host config) ----------
