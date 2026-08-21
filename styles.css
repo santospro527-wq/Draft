@@ -130,18 +130,29 @@
     transition: transform .1s ease, box-shadow .15s ease;
   }
   button:active{ transform: translateY(1px); }
-  .btn-gold{ background: linear-gradient(180deg, var(--gold-bright), var(--gold)); color: #2a1d05; box-shadow: 0 4px 0 #8a6a25;}
+  .btn-gold{ background: linear-gradient(180deg, var(--gold-bright), var(--gold)); color: #2a1d05; box-shadow: 0 4px 0 #8a6a25; display:block;   align-self: center; margin:auto; margin-bottom: 3%; margin-top: 3%; transform: scale(1.2); transition: all 0.5s ease;}
   .btn-gold:active{ box-shadow: 0 2px 0 #8a6a25; }
-  .btn-ghost{ background: transparent; color: var(--ink); border: 1.5px solid var(--ink-soft); }
-  .btn-block{ width:100%; }
+  .btn-ghost{ background: #ffffffd0; color: var(--ink); border: 1.5px solid var(--ink-soft); display:block; align-self: center;  margin:auto;  transition: all 0.5s ease;}
+  .btn-block{ width:100%;}
   button:disabled{ opacity:0.45; cursor:not-allowed; }
+
+  .btn-gold:hover
+  {
+    transform: scale(1.3);
+  }
+
+  .btn-ghost:hover
+  {
+    transform: scale(1.1);
+  }
 
   .setup-actions{ text-align:center; margin-top: 22px; }
   .error{ color: var(--stamp); font-size:13px; margin-top:8px; min-height:16px; }
 
   /* ---- lobby / rooms ---- */
-  .lobby-choice{ display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-top:10px; }
-  .lobby-choice button{ flex:1 1 220px; }
+  .lobby-choice{ display:block; margin-top:10px; text-align: center; margin: auto; align-items: center; align-content: center;}
+
+
   .code-display{
     
     font-weight:700;
