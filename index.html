@@ -400,6 +400,9 @@
       <section>
         <h2 style="font-family:var(--font-display);font-size:22px;">Ya estás en la sala <span id="guestCodeLabel"></span></h2>
         <p class="hint waiting-pulse" id="guestWaitText">Esperando a que el anfitrión arranque el remate&hellip;</p>
+        <div class="setup-actions">
+          <button class="btn-ghost" id="leaveWaitingRoomBtn">Salir de la sala</button>
+        </div>
       </section>
     </div>
   </div>
@@ -411,6 +414,7 @@
 
       <div class="lot-wrap">
         <div class="room-code-chip" id="draftCodeChip"></div>
+        <button class="btn-ghost" id="leaveRoomBtn">Salir de la sala</button>
         <div class="lot-card">
           <div class="lot-num" id="lotNum">LOTE 1 / 10</div>
           <div class="lot-cat" id="lotCat">Categoría</div>
@@ -573,6 +577,32 @@
     });
   }
 
+  function leaveRoom(){
+    var leavingCode = roomCode;
+    var leavingSlot = mySlot;
+    var wasLocal = localMode;
+    var cleanup = function(){
+      detachRoomListener();
+      clearSession();
+      roomCode = null;
+      mySlot = null;
+      room = null;
+      localMode = false;
+      showScreen("lobby");
+    };
+
+    if(wasLocal || !leavingCode){ cleanup(); return; }
+    if(leavingSlot === 0 || !room){
+      db.ref("rooms/" + leavingCode).remove().then(cleanup).catch(cleanup);
+      return;
+    }
+    if(room.phase === "setup"){
+      db.ref("rooms/" + leavingCode + "/players/1").remove().then(cleanup).catch(cleanup);
+      return;
+    }
+    db.ref("rooms/" + leavingCode).remove().then(cleanup).catch(cleanup);
+  }
+
   function onRoomGone(){
     // La sala fue borrada (host canceló o expiró). Volvemos al inicio.
     clearSession();
@@ -719,12 +749,10 @@
   }
 
   $("cancelHostBtn").addEventListener("click", function(){
-    if(roomCode){ db.ref("rooms/" + roomCode).remove(); }
-    detachRoomListener();
-    clearSession();
-    roomCode = null; mySlot = null; room = null;
-    showScreen("lobby");
+    leaveRoom();
   });
+  $("leaveWaitingRoomBtn").addEventListener("click", leaveRoom);
+  $("leaveRoomBtn").addEventListener("click", leaveRoom);
 
   $("startFromHostBtn").addEventListener("click", function(){
     if(!room || !room.players[1]) return;
