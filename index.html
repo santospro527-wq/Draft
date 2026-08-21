@@ -585,6 +585,12 @@
       player.won = listValue(player.won);
       return player;
     });
+    value.lots = listValue(value.lots);
+    value.lotIndex = Number.isInteger(value.lotIndex) ? value.lotIndex : 0;
+    value.currentBid = typeof value.currentBid === "number" ? value.currentBid : 0;
+    value.turn = value.turn === 1 ? 1 : 0;
+    value.leader = value.leader === 0 || value.leader === 1 ? value.leader : null;
+    value.phase = value.phase || "setup";
     return value;
   }
 
@@ -841,7 +847,7 @@
         }
       }
     } else if(room.phase === "bidding" || room.phase === "result"){
-      $("draftCodeChip").textContent = "SALA " + roomCode;
+      $("draftCodeChip").textContent = localMode ? "PARTIDA LOCAL" : "SALA " + roomCode;
       showScreen("draft");
       renderDraft();
     } else if(room.phase === "end"){
@@ -890,6 +896,10 @@
     var pi = room.turn;
     var other = 1 - pi;
     var p = room.players[pi];
+    if(!p || !room.players[other]){
+      $("bidBox").innerHTML = '<p class="error" style="text-align:center;">Falta un jugador conectado. Esperando la sala&hellip;</p>';
+      return;
+    }
     var maxLotsPerPlayer = room.lots.length / 2;
     var reachedLotLimit = p.won.length >= maxLotsPerPlayer;
     var nextAmount = room.currentBid + 1;
@@ -1030,11 +1040,8 @@
       '</div></div>';
     }
 
-    var isNextLotOwner = (mySlot === 0); // cualquiera de los dos puede avanzar; lo dispara sólo el host para evitar doble escritura
     html += '<div style="text-align:center;margin-top:14px;">' +
-      (isNextLotOwner
-        ? '<button class="btn-gold" id="nextLotBtn">' + (room.lotIndex + 1 < room.lots.length ? "Siguiente lote" : "Ver resultado final") + '</button>'
-        : '<p class="waiting-note">Esperando que continúe la partida&hellip;</p>') +
+      '<button class="btn-gold" id="nextLotBtn">' + (room.lotIndex + 1 < room.lots.length ? "Siguiente lote" : "Ver resultado final") + '</button>' +
       '</div>';
 
     $("bidBox").innerHTML = html;
@@ -1042,19 +1049,47 @@
     var nextLotBtn = $("nextLotBtn");
     if(nextLotBtn){
       nextLotBtn.addEventListener("click", function(){
-        room.lotIndex++;
-        if(room.lotIndex >= room.lots.length){
-          room.phase = "end";
-        } else {
-          room.currentBid = 0;
-          room.leader = null;
-          room.passCount = 0;
-          room.turn = room.lotIndex % 2;
-          room.phase = "bidding";
-        }
-        writeRoom(room);
+        nextLotBtn.disabled = true;
+        advanceToNextLot();
       });
     }
+  }
+
+  function advanceToNextLot(){
+    if(localMode){
+      room.lotIndex++;
+      if(room.lotIndex >= room.lots.length){
+        room.phase = "end";
+      } else {
+        room.currentBid = 0;
+        room.leader = null;
+        room.passCount = 0;
+        room.turn = room.lotIndex % 2;
+        room.phase = "bidding";
+      }
+      onRoomUpdate();
+      return;
+    }
+
+    if(!roomRef) return;
+    roomRef.transaction(function(value){
+      if(!value || value.phase !== "result") return;
+      value = normalizeRoom(value);
+      value.lotIndex++;
+      if(value.lotIndex >= value.lots.length){
+        value.phase = "end";
+      } else {
+        value.currentBid = 0;
+        value.leader = null;
+        value.passCount = 0;
+        value.turn = value.lotIndex % 2;
+        value.phase = "bidding";
+      }
+      value.updatedAt = Date.now();
+      return value;
+    }).catch(function(error){
+      console.error("No se pudo avanzar al siguiente lote:", error);
+    });
   }
 
   // ---------- END ----------
