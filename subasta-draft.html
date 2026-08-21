@@ -87,6 +87,7 @@
 
   .row{ display:flex; gap:14px; flex-wrap:wrap; }
   .field{ flex:1 1 180px; }
+  .local-only{ display:none; }
   label{ display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color: var(--ink-soft); margin-bottom:5px; font-weight:600;}
   input[type=text], input[type=number], input[type=tel], textarea{
     width:100%;
@@ -264,7 +265,7 @@
 <div class="wrap">
 
   <div class="brand">
-    <div class="eyebrow">Casa de remates &bull; 2 jugadores &bull; online</div>
+    <div class="eyebrow">Casa de remates &bull; 2 jugadores &bull; online o local</div>
     <h1>
       <svg class="gavel" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect x="2" y="16.5" width="9" height="2.4" rx="1" transform="rotate(-40 2 16.5)" fill="#c9a24b"/>
@@ -281,11 +282,12 @@
   <div class="screen active" id="screen-lobby">
     <div class="card">
       <section>
-        <h2>Jugá con alguien, a la distancia</h2>
-        <p class="hint">Uno crea la sala y comparte el código de 4 dígitos. El otro se une con ese código.</p>
+        <h2>Elegí cómo jugar</h2>
+        <p class="hint">Podés jugar online con un código o compartir el dispositivo con otra persona.</p>
         <div class="lobby-choice">
           <button class="btn-gold" id="goCreateBtn">Crear sala</button>
           <button class="btn-ghost" id="goJoinBtn">Unirme con un código</button>
+          <button class="btn-ghost" id="goLocalBtn">Jugar en este dispositivo</button>
         </div>
         <div class="error" id="lobbyError"></div>
       </section>
@@ -301,6 +303,10 @@
           <div class="field">
             <label for="hostName">Tu nombre</label>
             <input type="text" id="hostName" value="Jugador 1" maxlength="20">
+          </div>
+          <div class="field local-only" id="localPlayerField">
+            <label for="localPlayerName">Nombre del otro jugador</label>
+            <input type="text" id="localPlayerName" value="Jugador 2" maxlength="20">
           </div>
           <div class="field" style="flex:0 0 140px;">
             <label for="budget">Presupuesto ($)</label>
@@ -513,6 +519,7 @@ const analytics = getAnalytics(app);
   // ---------- session / room plumbing ----------
   var roomCode = null;
   var mySlot = null; // 0 = host, 1 = guest
+  var localMode = false;
   var roomRef = null;
   var room = null; // last known state from firebase
   var SESSION_KEY = "elremate_session_v1";
@@ -560,6 +567,10 @@ const analytics = getAnalytics(app);
 
   function writeRoom(patch){
     room = Object.assign({}, room, patch, { updatedAt: Date.now() });
+    if(localMode){
+      onRoomUpdate();
+      return Promise.resolve();
+    }
     return db.ref("rooms/" + roomCode).set(room).catch(function(e){
       console.error("No se pudo guardar el estado:", e);
     });
@@ -575,10 +586,19 @@ const analytics = getAnalytics(app);
 
   // ---------- LOBBY ----------
   $("goCreateBtn").addEventListener("click", function(){
+    localMode = false;
+    $("localPlayerField").style.display = "none";
+    $("createRoomBtn").textContent = "Crear sala";
     showScreen("create");
   });
   $("goJoinBtn").addEventListener("click", function(){
     showScreen("join");
+  });
+  $("goLocalBtn").addEventListener("click", function(){
+    localMode = true;
+    $("localPlayerField").style.display = "block";
+    $("createRoomBtn").textContent = "Comenzar partida local";
+    showScreen("create");
   });
   $("backFromCreateBtn").addEventListener("click", function(){ showScreen("lobby"); });
   $("backFromJoinBtn").addEventListener("click", function(){ showScreen("lobby"); });
@@ -630,6 +650,7 @@ const analytics = getAnalytics(app);
     var err = $("createError");
     err.textContent = "";
     var hostName = $("hostName").value.trim() || "Jugador 1";
+    var localPlayerName = $("localPlayerName").value.trim() || "Jugador 2";
     var budget = parseFloat($("budget").value);
     var lotCount = parseInt($("lotCount").value, 10);
     var pool = buildPool();
@@ -644,11 +665,11 @@ const analytics = getAnalytics(app);
     lots = lots.slice(0, lotCount);
 
     var newRoom = {
-      code: null,
-      phase: "setup",
+      code: localMode ? "LOCAL" : null,
+      phase: localMode ? "bidding" : "setup",
       players: [
         { name: hostName, budget: budget, startBudget: budget, won: [], connected: true },
-        null
+        localMode ? { name: localPlayerName, budget: budget, startBudget: budget, won: [], connected: true } : null
       ],
       lots: lots,
       lotIndex: 0,
@@ -663,6 +684,14 @@ const analytics = getAnalytics(app);
     };
 
     mySlot = 0;
+    if(localMode){
+      roomCode = "LOCAL";
+      room = newRoom;
+      $("draftCodeChip").textContent = "PARTIDA LOCAL";
+      showScreen("draft");
+      renderDraft();
+      return;
+    }
     err.textContent = "Creando sala…";
     createRoomWithFreeCode(newRoom, 0, function(code){
       err.textContent = "";
@@ -818,7 +847,7 @@ const analytics = getAnalytics(app);
     var maxLotsPerPlayer = room.lots.length / 2;
     var reachedLotLimit = p.won.length >= maxLotsPerPlayer;
     var nextAmount = room.currentBid + 1;
-    var itsMyTurn = (pi === mySlot);
+    var itsMyTurn = localMode || (pi === mySlot);
     var canRaise = itsMyTurn && !reachedLotLimit && p.budget >= nextAmount;
 
     // Si el jugador tiene menos de $1, no puede pujar: pasa el turno automáticamente.
@@ -1002,10 +1031,10 @@ const analytics = getAnalytics(app);
   }
 
   $("restartBtn").addEventListener("click", function(){
-    if(roomCode){ db.ref("rooms/" + roomCode).remove().catch(function(){}); }
+    if(roomCode && !localMode){ db.ref("rooms/" + roomCode).remove().catch(function(){}); }
     detachRoomListener();
     clearSession();
-    roomCode = null; mySlot = null; room = null;
+    roomCode = null; mySlot = null; room = null; localMode = false;
     $("customItems").value = "";
     catState = CATEGORIES.map(function(c, i){ return { idx: i, on: true }; });
     renderCats();
