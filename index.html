@@ -333,6 +333,7 @@
     value.currentBid = typeof value.currentBid === "number" ? value.currentBid : 0;
     value.turn = value.turn === 1 ? 1 : 0;
     value.leader = value.leader === 0 || value.leader === 1 ? value.leader : null;
+    value.turnDeadline = typeof value.turnDeadline === "number" ? value.turnDeadline : 0;
     value.phase = value.phase || "setup";
     return value;
   }
@@ -476,6 +477,7 @@
       passCount: 0,
       resultWinner: null,
       resultAmount: 0,
+      turnDeadline: 0,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -527,6 +529,7 @@
   $("startFromHostBtn").addEventListener("click", function(){
     if(!room || !room.players[1]) return;
     room.turn = room.lotIndex % 2;
+    room.turnDeadline = Date.now() + 30000;
     room.phase = "bidding";
     writeRoom(room);
   });
@@ -649,6 +652,12 @@
     var itsMyTurn = localMode || (pi === mySlot);
     var canRaise = itsMyTurn && !reachedLotLimit && p.budget >= nextAmount;
 
+    if(!room.turnDeadline){
+      room.turnDeadline = Date.now() + 30000;
+      writeRoom(room);
+    }
+    var roomDeadline = room.turnDeadline;
+
     // Si el jugador tiene menos de $1, no puede pujar: pasa el turno automáticamente.
     // Solo lo ejecuta el dueño de ese turno para evitar escrituras duplicadas.
     if(room.currentBid === 0 && p.budget < 1){
@@ -659,9 +668,15 @@
       return;
     }
 
+    var remainingSeconds = Math.max(0, Math.ceil((room.turnDeadline - Date.now()) / 1000));
     $("turnBanner").innerHTML =
       'Turno de <strong class="p' + (pi + 1) + '">' + escapeHtml(p.name) + '</strong>' +
-      (itsMyTurn ? '<span class="you-note">¡Te toca a vos!</span>' : '<span class="you-note">Esperando su jugada&hellip;</span>');
+      (itsMyTurn ? '<span class="you-note">¡Te toca a vos!</span>' : '<span class="you-note">Esperando su jugada&hellip;</span>') +
+      '<span class="timer" id="bidTimer" role="status" aria-live="polite">' +
+        '<span class="timer-label">TIEMPO RESTANTE</span>' +
+        '<span class="timer-value" id="bidTimerValue">' + remainingSeconds + '</span>' +
+        '<span class="timer-unit">SEGUNDOS</span>' +
+      '</span>';
 
     var statusLine = room.leader === null
       ? '<span class="status-chip wait">Todavía sin pujas</span>'
@@ -699,6 +714,24 @@
 
     $("bidBox").innerHTML = html;
 
+    var timer = $("bidTimer");
+    var timerValue = $("bidTimerValue");
+    if(timer){
+      var timerId = setInterval(function(){
+        if(!room || room.phase !== "bidding" || room.turnDeadline !== roomDeadline){
+          clearInterval(timerId);
+          return;
+        }
+        var seconds = Math.max(0, Math.ceil((roomDeadline - Date.now()) / 1000));
+        timerValue.textContent = seconds;
+        timer.classList.toggle("urgent", seconds <= 5);
+        if(seconds === 0){
+          clearInterval(timerId);
+          handleBidTimeout(roomDeadline);
+        }
+      }, 250);
+    }
+
     var raiseBtn = $("raiseBtn");
     if(raiseBtn){
       raiseBtn.addEventListener("click", function(){
@@ -706,6 +739,7 @@
         room.leader = pi;
         room.turn = other;
         room.passCount = 0;
+        room.turnDeadline = Date.now() + 30000;
         writeRoom(room);
       });
     }
@@ -729,6 +763,7 @@
         room.leader = pi;
         room.turn = other;
         room.passCount = 0;
+        room.turnDeadline = Date.now() + 30000;
         writeRoom(room);
       });
     }
@@ -740,6 +775,41 @@
         resolveSold(room.leader, room.currentBid);
       });
     }
+  }
+
+  function handleBidTimeout(deadline){
+    if(!room || room.phase !== "bidding" || room.turnDeadline !== deadline) return;
+    if(!localMode && mySlot !== room.turn) return;
+    var pi = room.turn;
+    var other = 1 - pi;
+    var p = room.players[pi];
+    var nextAmount = room.currentBid + 1;
+    if(!p) return;
+
+    if(room.currentBid === 0 && p.budget < 1){
+      room.turn = other;
+      room.turnDeadline = Date.now() + 30000;
+      writeRoom(room);
+      return;
+    }
+
+    if(p.won.length >= room.lots.length / 2 || p.budget < nextAmount){
+      if(room.leader !== null){
+        resolveSold(room.leader, room.currentBid);
+      } else {
+        room.turn = other;
+        room.turnDeadline = Date.now() + 30000;
+        writeRoom(room);
+      }
+      return;
+    }
+
+    room.currentBid = nextAmount;
+    room.leader = pi;
+    room.turn = other;
+    room.passCount = 0;
+    room.turnDeadline = Date.now() + 30000;
+    writeRoom(room);
   }
 
   function resolveSold(winnerIdx, amount){
@@ -808,6 +878,7 @@
         room.leader = null;
         room.passCount = 0;
         room.turn = room.lotIndex % 2;
+        room.turnDeadline = Date.now() + 30000;
         room.phase = "bidding";
       }
       onRoomUpdate();
@@ -826,6 +897,7 @@
         value.leader = null;
         value.passCount = 0;
         value.turn = value.lotIndex % 2;
+        value.turnDeadline = Date.now() + 30000;
         value.phase = "bidding";
       }
       value.updatedAt = Date.now();
