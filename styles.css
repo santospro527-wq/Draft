@@ -42,6 +42,15 @@
     min-height:100vh;
     padding: 28px 16px 60px;
   }
+
+  #customCuenta
+  {
+    background-color: #fff;
+    width: fit-content;
+    padding: 6px;
+    border-radius: 15px;
+  }
+
   .wrap{max-width: 1120px; margin: 0 auto;}
   .brand{ text-align:center; margin-bottom: 14px; }
   .brand .eyebrow{
