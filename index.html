@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Arizonia&family=Roboto+Slab:wght@100..900&display=swap" rel="stylesheet">
-<title>Draft</title>
+<title id="paginatitulo">Draft - Inicio</title>
 <link rel="icon" href="logo.png">
 <link rel="shortcut icon" href="logo.png">
 
@@ -232,6 +232,8 @@
     { name: "Ideas random", items: ["Un unicornio de mascota","Ser invisible todos los lunes","Un mayordomo personal","Una isla propia","Un auto que vuela","Poder pausar el tiempo","Un genio que cumple 3 deseos","Un año sabático pago"] }
   ];
 
+  const titulo = document.getElementById("paginatitulo");
+
   // ---------- DOM refs ----------
   var $ = function(id){ return document.getElementById(id); };
   var screens = {
@@ -245,6 +247,30 @@
   };
   function showScreen(name){
     Object.keys(screens).forEach(function(k){ screens[k].classList.toggle("active", k === name); });
+    switch (name)
+    {
+      case "lobby":
+        titulo.innerHTML = "Draft - Inicio";
+        break;
+      case "create":
+        titulo.innerHTML = "Draft - Crear Partida";
+        break;
+      case "join":
+        titulo.innerHTML = "Draft - Unirse a Partida";
+        break;
+      case "draft":
+        titulo.innerHTML = "Draft - En Partida";
+        break;
+      case "end":
+        titulo.innerHTML = "Draft - Resultados";
+        break;
+      case "waiting-host":
+        titulo.innerHTML = "Draft - Esperando...";
+        break;
+      case "waiting-guest":
+        titulo.innerHTML = "Draft - Esperando...";
+        break;
+    }
   }
 
   function fmt(n){
