@@ -138,6 +138,7 @@
       <section>
         <h2><span class="n">03</span> Agregá los tuyos <span style="font-weight:400;color:var(--ink-soft);font-size:12px;">(opcional)</span></h2>
         <p class="hint">Un objeto, lugar o cosa separados con Enter. Se suman al resto de los objetos.</p>
+         <p id="customCuenta">&#128712; Objetos Añadidos: 0</p>
         <textarea id="customItems" placeholder="Ej:&#10;Entradas al recital&#10;Un fin de semana en la playa&#10;La última porción de pizza"></textarea>
       </section>
     </div>
@@ -293,6 +294,13 @@
     { name: "Cualidades", items: ["Ser millonario","Nunca envejecer","Suerte infinita","Memoria perfecta","Carisma total","Inteligencia extrema","Paciencia infinita","Creatividad sin límites"] },
     { name: "Ideas random", items: ["Un unicornio de mascota","Ser invisible todos los lunes","Un mayordomo personal","Una isla propia","Un auto que vuela","Poder pausar el tiempo","Un genio que cumple 3 deseos","Un año sabático pago"] }
   ];
+
+  const customItems = document.getElementById("customItems");
+  customItems.addEventListener('input', () => {
+  const lineas = customItems.value.split('\n').filter(linea => linea.trim() !== "");
+  const msj = document.getElementById("customCuenta");
+  msj.innerHTML = "&#128712; Objetos Añadidos: " + lineas.length;
+  });
 
   const titulo = document.getElementById("paginatitulo");
 
