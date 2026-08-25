@@ -16,8 +16,7 @@
 
   <div class="brand">
     <div class="eyebrow">&bull; 2 jugadores &bull; online o local &bull;</div>
-    <br>
-    <div class="titulo">~Draft~</div>
+    <div class="titulo">Draft</div>
     <div class="sub">Pujá más o dejá a tu rival que se lo lleve.</div>
   </div>
 
@@ -73,14 +72,13 @@
       <section>
         <h2><span class="n">03</span> Agregá los tuyos <span style="font-weight:400;color:var(--ink-soft);font-size:12px;">(opcional)</span></h2>
         <p class="hint">Un objeto, lugar o cosa separados con Enter. Se suman al resto de los objetos.</p>
-        <p id="customCuenta">&#128712; Objetos Añadidos: 0</p>
         <textarea id="customItems" placeholder="Ej:&#10;Entradas al recital&#10;Un fin de semana en la playa&#10;La última porción de pizza"></textarea>
       </section>
     </div>
 
     <div class="card">
       <section>
-        <h2><span class="n">04</span> Cuántos objetos subastar</h2>
+        <h2><span class="n">04</span> Cuántos objetos rematar</h2>
         <p class="hint">Se eligen al azar del total de temas seleccionados. Tiene que ser un número par.</p>
         <div class="row">
           <div class="field" style="flex:0 0 160px;">
@@ -106,7 +104,7 @@
         <div class="code-display" id="hostCodeDisplay">0000</div>
         <div class="status-row"><span class="dot" id="p2dot"></span><span id="p2statusText" class="waiting-pulse">Esperando a que se una otro jugador&hellip;</span></div>
         <div class="setup-actions">
-          <button class="btn-gold" id="startFromHostBtn" disabled>Comenzar partida</button>
+          <button class="btn-gold" id="startFromHostBtn" disabled>Comenzar remate</button>
           <button class="btn-ghost" id="cancelHostBtn">Cancelar sala</button>
         </div>
       </section>
@@ -144,7 +142,7 @@
     <div class="card">
       <section>
         <h2 style="font-family:var(--font-display);font-size:22px;">Ya estás en la sala <span id="guestCodeLabel"></span></h2>
-        <p class="hint waiting-pulse" id="guestWaitText">Esperando a que el anfitrión comienze la partida&hellip;</p>
+        <p class="hint waiting-pulse" id="guestWaitText">Esperando a que el anfitrión arranque el remate&hellip;</p>
         <div class="setup-actions">
           <button class="btn-ghost" id="leaveWaitingRoomBtn">Salir de la sala</button>
         </div>
@@ -186,7 +184,8 @@
       </section>
     </div>
     <div class="setup-actions">
-      <button class="btn-gold" id="restartBtn">Volver al inicio</button>
+      <button class="btn-ghost" id="newDraftBtn">Hacer otro draft</button>
+      <button class="btn-gold" id="restartBtn">Cerrar sala y volver al inicio</button>
     </div>
   </div>
 
@@ -228,14 +227,6 @@
     { name: "Cualidades", items: ["Ser millonario","Nunca envejecer","Suerte infinita","Memoria perfecta","Carisma total","Inteligencia extrema","Paciencia infinita","Creatividad sin límites"] },
     { name: "Ideas random", items: ["Un unicornio de mascota","Ser invisible todos los lunes","Un mayordomo personal","Una isla propia","Un auto que vuela","Poder pausar el tiempo","Un genio que cumple 3 deseos","Un año sabático pago"] }
   ];
-
-  const customItems = document.getElementById("customItems");
-  customItems.addEventListener('input', () => {
-  const lineas = customItems.value.split('\n').filter(linea => linea.trim() !== "");
-  const msj = document.getElementById("customCuenta");
-  msj.innerHTML = "&#128712; Objetos Añadidos: " + lineas.length;
-  });
-
 
   // ---------- DOM refs ----------
   var $ = function(id){ return document.getElementById(id); };
@@ -863,8 +854,12 @@
       '</div></div>';
     }
 
+    var canManageRoom = localMode || mySlot === 0;
+    var nextLabel = room.lotIndex + 1 < room.lots.length ? "Siguiente objeto" : "Ver resultado final";
     html += '<div style="text-align:center;margin-top:14px;">' +
-      '<button class="btn-gold" id="nextLotBtn">' + (room.lotIndex + 1 < room.lots.length ? "Siguiente objeto" : "Ver resultado final") + '</button>' +
+      (canManageRoom
+        ? '<button class="btn-gold" id="nextLotBtn">' + nextLabel + '</button>'
+        : '<p class="waiting-note">Esperando a que el creador pase al siguiente objeto&hellip;</p>') +
       '</div>';
 
     $("bidBox").innerHTML = html;
@@ -879,6 +874,8 @@
   }
 
   function advanceToNextLot(){
+    if(!localMode && mySlot !== 0) return;
+
     if(localMode){
       room.lotIndex++;
       if(room.lotIndex >= room.lots.length){
@@ -934,9 +931,15 @@
         '<div class="end-total">Gastado: ' + fmt(spent) + ' &nbsp;&bull;&nbsp; Le quedó: ' + fmt(p.budget) + '</div></div>';
     });
     $("endList").innerHTML = html;
+    $("newDraftBtn").disabled = !localMode && mySlot !== 0;
+    $("restartBtn").disabled = !localMode && mySlot !== 0;
+    $("restartBtn").textContent = $("restartBtn").disabled
+      ? "Esperando al creador de la sala"
+      : "Cerrar sala y volver al inicio";
   }
 
   $("restartBtn").addEventListener("click", function(){
+    if(!localMode && mySlot !== 0) return;
     if(roomCode && !localMode){ db.ref("rooms/" + roomCode).remove().catch(function(){}); }
     detachRoomListener();
     clearSession();
@@ -945,6 +948,17 @@
     catState = CATEGORIES.map(function(c, i){ return { idx: i, on: true }; });
     renderCats();
     showScreen("lobby");
+  });
+
+  $("newDraftBtn").addEventListener("click", function(){
+    if(!localMode && mySlot !== 0) return;
+    if(roomCode && !localMode){ db.ref("rooms/" + roomCode).remove().catch(function(){}); }
+    detachRoomListener();
+    clearSession();
+    roomCode = null; mySlot = null; room = null; localMode = false;
+    $("createRoomBtn").textContent = "Crear sala";
+    $("localPlayerField").style.display = "none";
+    showScreen("create");
   });
 
   // ---------- resume session on load ----------
