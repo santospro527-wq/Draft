@@ -36,6 +36,14 @@
     height: 140px;
   }
 
+  #customCuenta
+  {
+    background-color: #fff;
+    width: fit-content;
+    padding: 6px;
+    border-radius: 15px;
+  }
+
   html,body{margin:0;padding:0;}
   body{
     color: var(--paper);
