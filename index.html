@@ -898,6 +898,12 @@
       $("bidBox").innerHTML = '<p class="error" style="text-align:center;">Falta un jugador conectado. Esperando la sala&hellip;</p>';
       return;
     }
+    if(p.budget < 1 && room.players[other].budget < 1){
+      if(localMode || mySlot === 0){
+        completeListsAndEnd();
+      }
+      return;
+    }
     var maxLotsPerPlayer = room.lots.length / 2;
     var reachedLotLimit = p.won.length >= maxLotsPerPlayer;
     var nextAmount = room.currentBid + 1;
@@ -1069,6 +1075,11 @@
     wp.budget -= amount;
     wp.won.push({ name: currentLot().name, price: amount });
 
+    if(room.players[0].budget < 1 && room.players[1].budget < 1){
+      completeListsAndEnd();
+      return;
+    }
+
     if(wp.won.length >= room.lots.length / 2){
       var remainingIdx = 1 - winnerIdx;
       var remainingPlayer = room.players[remainingIdx];
@@ -1084,6 +1095,20 @@
     room.phase = "result";
     room.resultWinner = winnerIdx;
     room.resultAmount = amount;
+    writeRoom(room);
+  }
+
+  function completeListsAndEnd(){
+    var maxLotsPerPlayer = room.lots.length / 2;
+    while(room.lotIndex < room.lots.length - 1){
+      room.lotIndex++;
+      var nextPlayer = room.players[0].won.length <= room.players[1].won.length ? 0 : 1;
+      if(room.players[nextPlayer].won.length >= maxLotsPerPlayer){
+        nextPlayer = 1 - nextPlayer;
+      }
+      room.players[nextPlayer].won.push({ name: currentLot().name, price: 0 });
+    }
+    room.phase = "end";
     writeRoom(room);
   }
 
