@@ -600,7 +600,7 @@
     value.lots = listValue(value.lots);
     value.lotIndex = Number.isInteger(value.lotIndex) ? value.lotIndex : 0;
     value.currentBid = typeof value.currentBid === "number" ? value.currentBid : 0;
-    value.turn = value.turn === 1 ? 1 : 0;
+    value.turn = Number.isInteger(value.turn) && value.turn >= 0 && value.turn < value.players.length ? value.turn : 0;
     value.leader = value.leader === 0 || value.leader === 1 ? value.leader : null;
     value.turnDeadline = typeof value.turnDeadline === "number" ? value.turnDeadline : 0;
     value.phase = value.phase || "setup";
@@ -808,7 +808,9 @@
   $("startFromHostBtn").addEventListener("click", function(){
     if(!room || !room.players[1]) return;
     room.mode = room.players.filter(Boolean).length >= 3 ? "auction" : "normal";
-    room.turn = room.lotIndex % 2;
+    room.turn = isAuctionMode()
+      ? room.lotIndex % room.players.filter(Boolean).length
+      : room.lotIndex % 2;
     room.turnDeadline = Date.now() + 30000;
     room.phase = "bidding";
     writeRoom(room);
@@ -1335,7 +1337,9 @@
         value.leader = null;
         value.passCount = 0;
         value.passed = [];
-        value.turn = value.lotIndex % 2;
+        value.turn = value.players.filter(Boolean).length >= 3
+          ? value.lotIndex % value.players.filter(Boolean).length
+          : value.lotIndex % 2;
         value.turnDeadline = Date.now() + 30000;
         value.phase = "bidding";
       }
