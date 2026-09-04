@@ -533,8 +533,21 @@
   var roomRef = null;
   var room = null; // last known state from firebase
   var SESSION_KEY = "elremate_session_v1";
+  function isActivePlayer(player){
+    return !!player && player.connected !== false;
+  }
+  function activePlayerCount(){
+    return room.players.filter(isActivePlayer).length;
+  }
+  function nextActivePlayer(fromSlot){
+    for(var step = 1; step <= room.players.length; step++){
+      var candidate = (fromSlot + step) % room.players.length;
+      if(isActivePlayer(room.players[candidate])) return candidate;
+    }
+    return fromSlot;
+  }
   function isAuctionMode(){
-    return !localMode && room && room.players && room.players.filter(Boolean).length >= 3;
+    return !localMode && room && room.mode === "auction";
   }
 
   function saveSession(){
@@ -605,6 +618,7 @@
     value.turnDeadline = typeof value.turnDeadline === "number" ? value.turnDeadline : 0;
     value.phase = value.phase || "setup";
     value.mode = value.mode || "normal";
+    value.hostSlot = Number.isInteger(value.hostSlot) ? value.hostSlot : 0;
     value.passed = listValue(value.passed);
     value.withdrawn = listValue(value.withdrawn);
     return value;
@@ -631,15 +645,31 @@
     };
 
     if(wasLocal || !leavingCode){ cleanup(); return; }
-    if(leavingSlot === 0 || !room){
+    if(!room){
       db.ref("rooms/" + leavingCode).remove().then(cleanup).catch(cleanup);
       return;
     }
     if(room.phase === "setup"){
+      if(leavingSlot === 0){
+        db.ref("rooms/" + leavingCode).remove().then(cleanup).catch(cleanup);
+        return;
+      }
       db.ref("rooms/" + leavingCode + "/players/" + leavingSlot).remove().then(cleanup).catch(cleanup);
       return;
     }
-    db.ref("rooms/" + leavingCode).remove().then(cleanup).catch(cleanup);
+    room.players[leavingSlot].connected = false;
+    if(room.hostSlot === leavingSlot){
+      var replacement = room.players.findIndex(isActivePlayer);
+      room.hostSlot = replacement >= 0 ? replacement : null;
+    }
+    if(room.leader === leavingSlot){
+      room.leader = null;
+      room.currentBid = 0;
+      room.passed = [];
+      room.withdrawn = [];
+    }
+    if(room.turn === leavingSlot) room.turn = nextActivePlayer(leavingSlot);
+    writeRoom(room).then(cleanup).catch(cleanup);
   }
 
   function onRoomGone(){
@@ -747,6 +777,7 @@
         return list;
       })(),
       maxPlayers: maxPlayers,
+      hostSlot: 0,
       mode: "normal",
       lots: lots,
       lotIndex: 0,
@@ -869,7 +900,7 @@
         $("hostCodeDisplay").textContent = roomCode;
         var p2 = room.players[1];
         $("p2dot").classList.toggle("on", !!p2);
-        var joined = room.players.filter(Boolean).length;
+        var joined = room.players.filter(isActivePlayer).length;
         $("p2statusText").textContent = joined + " jugador" + (joined === 1 ? "" : "es") + " conectados. ¡Listos para arrancar!";
         $("p2statusText").classList.toggle("waiting-pulse", joined < 2);
         $("startFromHostBtn").disabled = joined < 2;
@@ -918,8 +949,8 @@
     for(var playerIndex = 0; playerIndex < 6; playerIndex++){
       var ledger = $("ledgerP" + (playerIndex + 1));
       if(!ledger) continue;
-      ledger.style.display = room.players[playerIndex] ? "block" : "none";
-      if(room.players[playerIndex]) renderLedger(playerIndex);
+      ledger.style.display = isActivePlayer(room.players[playerIndex]) ? "block" : "none";
+      if(isActivePlayer(room.players[playerIndex])) renderLedger(playerIndex);
     }
 
     var lot = currentLot();
@@ -949,7 +980,7 @@
       var total = room.players.length;
       for(var step = 1; step <= total; step++){
         var candidate = (room.turn + step) % total;
-        if(room.players[candidate] && room.passed.indexOf(candidate) < 0 && room.withdrawn.indexOf(candidate) < 0 && room.players[candidate].budget >= 1){
+        if(isActivePlayer(room.players[candidate]) && room.passed.indexOf(candidate) < 0 && room.withdrawn.indexOf(candidate) < 0 && room.players[candidate].budget >= 1){
           return candidate;
         }
       }
@@ -960,7 +991,7 @@
       var pi = room.turn;
       var p = room.players[pi];
       if(!p) return;
-      var activePlayers = room.players.filter(Boolean);
+      var activePlayers = room.players.filter(isActivePlayer);
       var itsMyTurn = pi === mySlot;
       var canRaise = itsMyTurn && p.budget >= room.currentBid + 1;
       var canPass = itsMyTurn && room.currentBid >= 1 && pi !== room.leader;
@@ -1011,14 +1042,14 @@
       $("passBtn").addEventListener("click", function(){
         if(room.currentBid < 1) return;
         if(room.passed.indexOf(pi) < 0) room.passed.push(pi);
-        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader; }).length >= activePlayers.length - 1){
+        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader && isActivePlayer(room.players[index]); }).length >= activePlayers.length - 1){
           resolveSold(room.leader, room.currentBid); return;
         }
         room.turn = nextAuctionTurn(); room.turnDeadline = Date.now() + 30000; writeRoom(room);
       });
       $("endTurnBtn").addEventListener("click", function(){
         if(room.withdrawn.indexOf(pi) < 0) room.withdrawn.push(pi);
-        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader; }).length >= activePlayers.length - 1){
+        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader && isActivePlayer(room.players[index]); }).length >= activePlayers.length - 1){
           resolveSold(room.leader, room.currentBid); return;
         }
         if(room.leader === null && room.withdrawn.length >= activePlayers.length){
@@ -1168,7 +1199,7 @@
     var total = room.players.length;
     for(var step = 1; step <= total; step++){
       var candidate = (room.turn + step) % total;
-      if(room.players[candidate] && room.passed.indexOf(candidate) < 0 && room.withdrawn.indexOf(candidate) < 0 && room.players[candidate].budget >= 1) return candidate;
+      if(isActivePlayer(room.players[candidate]) && room.passed.indexOf(candidate) < 0 && room.withdrawn.indexOf(candidate) < 0 && room.players[candidate].budget >= 1) return candidate;
     }
     return room.turn;
   }
@@ -1178,7 +1209,7 @@
     if(isAuctionMode()){
       if(room.currentBid >= 1 && room.turn !== room.leader){
         if(room.passed.indexOf(room.turn) < 0) room.passed.push(room.turn);
-        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader; }).length >= room.players.filter(Boolean).length - 1){
+        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader && isActivePlayer(room.players[index]); }).length >= activePlayerCount() - 1){
           resolveSold(room.leader, room.currentBid); return;
         }
       }
@@ -1257,7 +1288,7 @@
 
   function completeListsAndEnd(){
     if(isAuctionMode()){
-      var auctionPlayers = room.players.filter(Boolean);
+      var auctionPlayers = room.players.filter(isActivePlayer);
       var auctionIndex = 0;
       while(room.lotIndex < room.lots.length - 1){
         room.lotIndex++;
@@ -1300,7 +1331,7 @@
       '</div></div>';
     }
 
-    var canManageRoom = localMode || mySlot === 0;
+    var canManageRoom = localMode || mySlot === room.hostSlot;
     var nextLabel = room.lotIndex + 1 < room.lots.length ? "Siguiente objeto" : "Ver resultado final";
     html += '<div style="text-align:center;margin-top:14px;">' +
       (canManageRoom
@@ -1320,7 +1351,7 @@
   }
 
   function advanceToNextLot(){
-    if(!localMode && mySlot !== 0) return;
+    if(!localMode && mySlot !== room.hostSlot) return;
 
     if(localMode){
       room.lotIndex++;
@@ -1352,8 +1383,8 @@
         value.passCount = 0;
         value.passed = [];
         value.withdrawn = [];
-        value.turn = value.players.filter(Boolean).length >= 3
-          ? value.lotIndex % value.players.filter(Boolean).length
+        value.turn = value.players.filter(isActivePlayer).length >= 3
+          ? value.lotIndex % value.players.filter(isActivePlayer).length
           : value.lotIndex % 2;
         value.turnDeadline = Date.now() + 30000;
         value.phase = "bidding";
@@ -1369,7 +1400,7 @@
   function renderEnd(){
     var html = "";
     var revealIndex = 0;
-    room.players.filter(Boolean).forEach(function(p){
+    room.players.filter(isActivePlayer).forEach(function(p){
       var spent = p.startBudget - p.budget;
       var wonHtml = p.won.length
         ? '<ul class="won-list">' + p.won.map(function(w){
@@ -1382,15 +1413,15 @@
         '<div class="end-total">Gastado: ' + fmt(spent) + ' &nbsp;&bull;&nbsp; Le quedó: ' + fmt(p.budget) + '</div></div>';
     });
     $("endList").innerHTML = html;
-    $("newDraftBtn").disabled = !localMode && mySlot !== 0;
-    $("restartBtn").disabled = !localMode && mySlot !== 0;
+    $("newDraftBtn").disabled = !localMode && mySlot !== room.hostSlot;
+    $("restartBtn").disabled = !localMode && mySlot !== room.hostSlot;
     $("restartBtn").textContent = $("restartBtn").disabled
       ? "Esperando al creador de la sala"
       : "Cerrar sala y volver al inicio";
   }
 
   $("restartBtn").addEventListener("click", function(){
-    if(!localMode && mySlot !== 0) return;
+    if(!localMode && mySlot !== room.hostSlot) return;
     if(roomCode && !localMode){ db.ref("rooms/" + roomCode).remove().catch(function(){}); }
     detachRoomListener();
     clearSession();
@@ -1402,7 +1433,7 @@
   });
 
   $("newDraftBtn").addEventListener("click", function(){
-    if(!localMode && mySlot !== 0) return;
+    if(!localMode && mySlot !== room.hostSlot) return;
     if(roomCode && !localMode){ db.ref("rooms/" + roomCode).remove().catch(function(){}); }
     detachRoomListener();
     clearSession();
