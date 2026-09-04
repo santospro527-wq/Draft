@@ -601,11 +601,12 @@
     value.lotIndex = Number.isInteger(value.lotIndex) ? value.lotIndex : 0;
     value.currentBid = typeof value.currentBid === "number" ? value.currentBid : 0;
     value.turn = Number.isInteger(value.turn) && value.turn >= 0 && value.turn < value.players.length ? value.turn : 0;
-    value.leader = value.leader === 0 || value.leader === 1 ? value.leader : null;
+    value.leader = Number.isInteger(value.leader) && value.leader >= 0 && value.leader < value.players.length ? value.leader : null;
     value.turnDeadline = typeof value.turnDeadline === "number" ? value.turnDeadline : 0;
     value.phase = value.phase || "setup";
     value.mode = value.mode || "normal";
     value.passed = listValue(value.passed);
+    value.withdrawn = listValue(value.withdrawn);
     return value;
   }
 
@@ -948,7 +949,7 @@
       var total = room.players.length;
       for(var step = 1; step <= total; step++){
         var candidate = (room.turn + step) % total;
-        if(room.players[candidate] && room.passed.indexOf(candidate) < 0 && room.players[candidate].budget >= 1){
+        if(room.players[candidate] && room.passed.indexOf(candidate) < 0 && room.withdrawn.indexOf(candidate) < 0 && room.players[candidate].budget >= 1){
           return candidate;
         }
       }
@@ -963,6 +964,7 @@
       var itsMyTurn = pi === mySlot;
       var canRaise = itsMyTurn && p.budget >= room.currentBid + 1;
       var canPass = itsMyTurn && room.currentBid >= 1 && pi !== room.leader;
+      var canEndTurn = itsMyTurn && room.withdrawn.indexOf(pi) < 0;
       var passedNames = room.passed.map(function(index){ return room.players[index] && room.players[index].name; }).filter(Boolean);
       var statusLine = room.leader === null
         ? '<span class="status-chip wait">Todavía sin pujas</span>'
@@ -982,7 +984,8 @@
         '<button class="btn-gold" id="raiseBtn"' + (canRaise ? "" : " disabled") + '>Pujar ' + fmt(room.currentBid + 1) + '</button>' +
         '<div class="custom-bid-control"><label for="customBid">Monto personalizado</label><input type="number" id="customBid" min="' + (room.currentBid + 0.01) + '" max="' + p.budget + '" step="0.01" placeholder="$ monto"' + (canRaise ? "" : " disabled") + '></div>' +
         '<button class="btn-custom" id="customBidBtn"' + (canRaise ? "" : " disabled") + '>Pujar monto</button>' +
-        '<button class="btn-ghost" id="passBtn"' + (canPass ? "" : " disabled") + '>Pasar</button></div>';
+        '<button class="btn-ghost" id="passBtn"' + (canPass ? "" : " disabled") + '>Pasar</button>' +
+        '<button class="btn-ghost" id="endTurnBtn"' + (canEndTurn ? "" : " disabled") + '>Terminar mi turno</button></div>';
       if(!itsMyTurn) html += '<p class="waiting-note">Esperando la jugada de ' + escapeHtml(p.name) + '&hellip;</p>';
       $("bidBox").innerHTML = html;
       var timer = $("bidTimer");
@@ -1008,8 +1011,18 @@
       $("passBtn").addEventListener("click", function(){
         if(room.currentBid < 1) return;
         if(room.passed.indexOf(pi) < 0) room.passed.push(pi);
-        if(room.leader !== null && room.passed.length >= activePlayers.length - 1){
+        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader; }).length >= activePlayers.length - 1){
           resolveSold(room.leader, room.currentBid); return;
+        }
+        room.turn = nextAuctionTurn(); room.turnDeadline = Date.now() + 30000; writeRoom(room);
+      });
+      $("endTurnBtn").addEventListener("click", function(){
+        if(room.withdrawn.indexOf(pi) < 0) room.withdrawn.push(pi);
+        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader; }).length >= activePlayers.length - 1){
+          resolveSold(room.leader, room.currentBid); return;
+        }
+        if(room.leader === null && room.withdrawn.length >= activePlayers.length){
+          room.phase = "result"; room.resultWinner = null; room.resultAmount = 0; writeRoom(room); return;
         }
         room.turn = nextAuctionTurn(); room.turnDeadline = Date.now() + 30000; writeRoom(room);
       });
@@ -1155,7 +1168,7 @@
     var total = room.players.length;
     for(var step = 1; step <= total; step++){
       var candidate = (room.turn + step) % total;
-      if(room.players[candidate] && room.passed.indexOf(candidate) < 0 && room.players[candidate].budget >= 1) return candidate;
+      if(room.players[candidate] && room.passed.indexOf(candidate) < 0 && room.withdrawn.indexOf(candidate) < 0 && room.players[candidate].budget >= 1) return candidate;
     }
     return room.turn;
   }
@@ -1165,7 +1178,7 @@
     if(isAuctionMode()){
       if(room.currentBid >= 1 && room.turn !== room.leader){
         if(room.passed.indexOf(room.turn) < 0) room.passed.push(room.turn);
-        if(room.leader !== null && room.passed.length >= room.players.filter(Boolean).length - 1){
+        if(room.leader !== null && room.passed.length + room.withdrawn.filter(function(index){ return index !== room.leader; }).length >= room.players.filter(Boolean).length - 1){
           resolveSold(room.leader, room.currentBid); return;
         }
       }
@@ -1200,6 +1213,7 @@
     room.leader = pi;
     room.turn = other;
     room.passCount = 0;
+    room.withdrawn = [];
     room.turnDeadline = Date.now() + 30000;
     writeRoom(room);
   }
@@ -1337,6 +1351,7 @@
         value.leader = null;
         value.passCount = 0;
         value.passed = [];
+        value.withdrawn = [];
         value.turn = value.players.filter(Boolean).length >= 3
           ? value.lotIndex % value.players.filter(Boolean).length
           : value.lotIndex % 2;
