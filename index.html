@@ -80,7 +80,7 @@
 <div class="wrap">
 
   <div class="brand">
-    <div class="eyebrow">&bull; 2 jugadores &bull; online o local &bull;</div>
+    <div class="eyebrow">&bull; 2 jugadores local &bull; 2 a 6 online &bull;</div>
     <div class="titulo">
       <img src="logo.png" alt="~Draft~">
     </div>
@@ -117,6 +117,16 @@
           <div class="field local-only" id="localPlayerField">
             <label for="localPlayerName">Segundo Jugador</label>
             <input type="text" id="localPlayerName" value="Jugador 2" maxlength="20">
+          </div>
+          <div class="field online-only" id="maxPlayersField" style="flex:0 0 180px;display:none;">
+            <label for="maxPlayers">Jugadores online</label>
+            <select id="maxPlayers">
+              <option value="2">2 (modo normal)</option>
+              <option value="3">3 jugadores</option>
+              <option value="4">4 jugadores</option>
+              <option value="5">5 jugadores</option>
+              <option value="6">6 jugadores</option>
+            </select>
           </div>
           <div class="field" style="flex:0 0 140px;">
             <label for="budget">Presupuesto ($)</label>
@@ -170,7 +180,7 @@
         <h2 style="font-family:var(--font-display);font-size:22px;">Compartí este código</h2>
         <p class="hint">Pasáselo al otro jugador para que se una a la sala.</p>
         <div class="code-display" id="hostCodeDisplay">0000</div>
-        <div class="status-row"><span class="dot" id="p2dot"></span><span id="p2statusText" class="waiting-pulse">Esperando a que se una otro jugador&hellip;</span></div>
+        <div class="status-row"><span class="dot" id="p2dot"></span><span id="p2statusText" class="waiting-pulse">Esperando jugadores&hellip;</span></div>
         <div class="setup-actions">
           <button class="btn-gold" id="startFromHostBtn" disabled>Comenzar remate</button>
           <button class="btn-ghost" id="cancelHostBtn">Cancelar sala</button>
@@ -239,6 +249,10 @@
       </div>
 
       <div class="ledger p2" id="ledgerP2"></div>
+      <div class="ledger p3" id="ledgerP3" style="display:none;"></div>
+      <div class="ledger p4" id="ledgerP4" style="display:none;"></div>
+      <div class="ledger p5" id="ledgerP5" style="display:none;"></div>
+      <div class="ledger p6" id="ledgerP6" style="display:none;"></div>
     </div>
   </div>
 
@@ -519,6 +533,9 @@
   var roomRef = null;
   var room = null; // last known state from firebase
   var SESSION_KEY = "elremate_session_v1";
+  function isAuctionMode(){
+    return !localMode && room && room.players && room.players.filter(Boolean).length >= 3;
+  }
 
   function saveSession(){
     try{
@@ -587,6 +604,8 @@
     value.leader = value.leader === 0 || value.leader === 1 ? value.leader : null;
     value.turnDeadline = typeof value.turnDeadline === "number" ? value.turnDeadline : 0;
     value.phase = value.phase || "setup";
+    value.mode = value.mode || "normal";
+    value.passed = listValue(value.passed);
     return value;
   }
 
@@ -616,7 +635,7 @@
       return;
     }
     if(room.phase === "setup"){
-      db.ref("rooms/" + leavingCode + "/players/1").remove().then(cleanup).catch(cleanup);
+      db.ref("rooms/" + leavingCode + "/players/" + leavingSlot).remove().then(cleanup).catch(cleanup);
       return;
     }
     db.ref("rooms/" + leavingCode).remove().then(cleanup).catch(cleanup);
@@ -634,6 +653,7 @@
   $("goCreateBtn").addEventListener("click", function(){
     localMode = false;
     $("localPlayerField").style.display = "none";
+    $("maxPlayersField").style.display = "block";
     $("createRoomBtn").textContent = "Crear sala";
     showScreen("create");
   });
@@ -644,6 +664,7 @@
   $("goLocalBtn").addEventListener("click", function(){
     localMode = true;
     $("localPlayerField").style.display = "block";
+    $("maxPlayersField").style.display = "none";
     $("createRoomBtn").textContent = "Comenzar partida local";
     showScreen("create");
   });
@@ -714,13 +735,18 @@
     while(lots.length < lotCount){ lots = lots.concat(shuffle(pool)); }
     lots = lots.slice(0, lotCount);
 
+    var maxPlayers = localMode ? 2 : Math.max(2, Math.min(6, parseInt($("maxPlayers").value, 10) || 2));
     var newRoom = {
       code: localMode ? "LOCAL" : null,
       phase: localMode ? "bidding" : "setup",
-      players: [
-        { name: hostName, budget: budget, startBudget: budget, won: [], connected: true },
-        localMode ? { name: localPlayerName, budget: budget, startBudget: budget, won: [], connected: true } : null
-      ],
+      players: (function(){
+        var list = new Array(maxPlayers).fill(null);
+        list[0] = { name: hostName, budget: budget, startBudget: budget, won: [], connected: true };
+        if(localMode) list[1] = { name: localPlayerName, budget: budget, startBudget: budget, won: [], connected: true };
+        return list;
+      })(),
+      maxPlayers: maxPlayers,
+      mode: "normal",
       lots: lots,
       lotIndex: 0,
       currentBid: 0,
@@ -730,6 +756,7 @@
       resultWinner: null,
       resultAmount: 0,
       turnDeadline: 0,
+      passed: [],
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -780,6 +807,7 @@
 
   $("startFromHostBtn").addEventListener("click", function(){
     if(!room || !room.players[1]) return;
+    room.mode = room.players.filter(Boolean).length >= 3 ? "auction" : "normal";
     room.turn = room.lotIndex % 2;
     room.turnDeadline = Date.now() + 30000;
     room.phase = "bidding";
@@ -804,12 +832,18 @@
       var val = snap.val();
       if(!val){ err.textContent = "No existe una sala con ese código."; return; }
       if(val.phase !== "setup"){ err.textContent = "Esa partida ya empezó."; return; }
-      if(val.players[1]){ err.textContent = "Esa sala ya tiene dos jugadores."; return; }
+      var players = listValue(val.players);
+      var maxPlayers = Math.max(2, Math.min(6, Number(val.maxPlayers) || 2));
+      var slot = -1;
+      for(var playerSlot = 0; playerSlot < maxPlayers; playerSlot++){
+        if(!players[playerSlot]){ slot = playerSlot; break; }
+      }
+      if(slot < 0 || slot >= maxPlayers){ err.textContent = "Esa sala ya está completa."; return; }
 
-      val.players[1] = { name: name, budget: val.players[0].budget, startBudget: val.players[0].budget, won: [], connected: true };
+      val.players[slot] = { name: name, budget: val.players[0].budget, startBudget: val.players[0].budget, won: [], connected: true };
       ref.set(val).then(function(){
         err.textContent = "";
-        mySlot = 1;
+        mySlot = slot;
         roomCode = code;
         saveSession();
         $("guestCodeLabel").textContent = code;
@@ -832,13 +866,14 @@
         $("hostCodeDisplay").textContent = roomCode;
         var p2 = room.players[1];
         $("p2dot").classList.toggle("on", !!p2);
-        $("p2statusText").textContent = p2 ? (p2.name + " se unió. ¡Listo para arrancar!") : "Esperando a que se una el jugador 2…";
-        $("p2statusText").classList.toggle("waiting-pulse", !p2);
-        $("startFromHostBtn").disabled = !p2;
+        var joined = room.players.filter(Boolean).length;
+        $("p2statusText").textContent = joined + " jugador" + (joined === 1 ? "" : "es") + " conectados. ¡Listos para arrancar!";
+        $("p2statusText").classList.toggle("waiting-pulse", joined < 2);
+        $("startFromHostBtn").disabled = joined < 2;
         if(!screens["waiting-host"].classList.contains("active") && !screens.create.classList.contains("active")){
           showScreen("waiting-host");
         }
-      } else if(mySlot === 1){
+      } else if(mySlot !== null && mySlot !== 0){
         $("guestCodeLabel").textContent = roomCode;
         if(!screens["waiting-guest"].classList.contains("active")){
           showScreen("waiting-guest");
@@ -877,8 +912,12 @@
   }
 
   function renderDraft(){
-    renderLedger(0);
-    renderLedger(1);
+    for(var playerIndex = 0; playerIndex < 6; playerIndex++){
+      var ledger = $("ledgerP" + (playerIndex + 1));
+      if(!ledger) continue;
+      ledger.style.display = room.players[playerIndex] ? "block" : "none";
+      if(room.players[playerIndex]) renderLedger(playerIndex);
+    }
 
     var lot = currentLot();
     $("lotNum").textContent = "objeto " + (room.lotIndex + 1) + " / " + room.lots.length;
@@ -891,12 +930,87 @@
   }
 
   function renderBidding(){
+    if(isAuctionMode()){
+      renderAuctionBidding();
+      return;
+    }
     var pi = room.turn;
     var other = 1 - pi;
     var p = room.players[pi];
     if(!p || !room.players[other]){
       $("bidBox").innerHTML = '<p class="error" style="text-align:center;">Falta un jugador conectado. Esperando la sala&hellip;</p>';
       return;
+    }
+
+    function nextAuctionTurn(){
+      var total = room.players.length;
+      for(var step = 1; step <= total; step++){
+        var candidate = (room.turn + step) % total;
+        if(room.players[candidate] && room.passed.indexOf(candidate) < 0 && room.players[candidate].budget >= 1){
+          return candidate;
+        }
+      }
+      return room.turn;
+    }
+
+    function renderAuctionBidding(){
+      var pi = room.turn;
+      var p = room.players[pi];
+      if(!p) return;
+      var activePlayers = room.players.filter(Boolean);
+      var itsMyTurn = pi === mySlot;
+      var canRaise = itsMyTurn && p.budget >= room.currentBid + 1;
+      var canPass = itsMyTurn && room.currentBid >= 1 && pi !== room.leader;
+      var passedNames = room.passed.map(function(index){ return room.players[index] && room.players[index].name; }).filter(Boolean);
+      var statusLine = room.leader === null
+        ? '<span class="status-chip wait">Todavía sin pujas</span>'
+        : '<span class="status-chip ready">Lidera ' + escapeHtml(room.players[room.leader].name) + ' con ' + fmt(room.currentBid) + '</span>';
+      if(!room.turnDeadline){
+        room.turnDeadline = Date.now() + 30000;
+        writeRoom(room);
+      }
+      var deadline = room.turnDeadline;
+      $("turnBanner").innerHTML =
+        'Turno de <strong class="p' + (pi + 1) + '">' + escapeHtml(p.name) + '</strong>' +
+        (itsMyTurn ? '<span class="you-note">¡Te toca a vos!</span>' : '<span class="you-note">Esperando su jugada&hellip;</span>') +
+        '<span class="timer" id="bidTimer" role="status" aria-live="polite"><span class="timer-label">TIEMPO RESTANTE</span><span class="timer-value" id="bidTimerValue">' + Math.max(0, Math.ceil((deadline - Date.now()) / 1000)) + '</span><span class="timer-unit">SEGUNDOS</span></span>';
+      var html = '<div style="text-align:center;margin-bottom:12px;">' + statusLine + '</div>';
+      if(passedNames.length) html += '<p class="waiting-note">Pasaron: ' + escapeHtml(passedNames.join(", ")) + '</p>';
+      html += '<div class="bid-row" style="justify-content:center;">' +
+        '<button class="btn-gold" id="raiseBtn"' + (canRaise ? "" : " disabled") + '>Pujar ' + fmt(room.currentBid + 1) + '</button>' +
+        '<div class="custom-bid-control"><label for="customBid">Monto personalizado</label><input type="number" id="customBid" min="' + (room.currentBid + 0.01) + '" max="' + p.budget + '" step="0.01" placeholder="$ monto"' + (canRaise ? "" : " disabled") + '></div>' +
+        '<button class="btn-custom" id="customBidBtn"' + (canRaise ? "" : " disabled") + '>Pujar monto</button>' +
+        '<button class="btn-ghost" id="passBtn"' + (canPass ? "" : " disabled") + '>Pasar</button></div>';
+      if(!itsMyTurn) html += '<p class="waiting-note">Esperando la jugada de ' + escapeHtml(p.name) + '&hellip;</p>';
+      $("bidBox").innerHTML = html;
+      var timer = $("bidTimer");
+      var timerValue = $("bidTimerValue");
+      var timerId = setInterval(function(){
+        if(!room || room.phase !== "bidding" || room.turnDeadline !== deadline){ clearInterval(timerId); return; }
+        var seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        timerValue.textContent = seconds;
+        timer.classList.toggle("urgent", seconds <= 5);
+        if(seconds === 0){ clearInterval(timerId); handleBidTimeout(deadline); }
+      }, 250);
+      var raise = $("raiseBtn");
+      var bid = function(amount){
+        room.currentBid = amount; room.leader = pi; room.passed = [];
+        room.turn = nextAuctionTurn(); room.turnDeadline = Date.now() + 30000; writeRoom(room);
+      };
+      if(raise) raise.addEventListener("click", function(){ bid(room.currentBid + 1); });
+      $("customBidBtn").addEventListener("click", function(){
+        var amount = Number($("customBid").value);
+        if(!isFinite(amount) || amount <= room.currentBid || amount > p.budget) return;
+        bid(amount);
+      });
+      $("passBtn").addEventListener("click", function(){
+        if(room.currentBid < 1) return;
+        if(room.passed.indexOf(pi) < 0) room.passed.push(pi);
+        if(room.leader !== null && room.passed.length >= activePlayers.length - 1){
+          resolveSold(room.leader, room.currentBid); return;
+        }
+        room.turn = nextAuctionTurn(); room.turnDeadline = Date.now() + 30000; writeRoom(room);
+      });
     }
     if(p.budget < 1 && room.players[other].budget < 1){
       if(localMode || mySlot === 0){
@@ -1035,8 +1149,26 @@
     }
   }
 
+  function nextAuctionTurn(){
+    var total = room.players.length;
+    for(var step = 1; step <= total; step++){
+      var candidate = (room.turn + step) % total;
+      if(room.players[candidate] && room.passed.indexOf(candidate) < 0 && room.players[candidate].budget >= 1) return candidate;
+    }
+    return room.turn;
+  }
+
   function handleBidTimeout(deadline){
     if(!room || room.phase !== "bidding" || room.turnDeadline !== deadline) return;
+    if(isAuctionMode()){
+      if(room.currentBid >= 1 && room.turn !== room.leader){
+        if(room.passed.indexOf(room.turn) < 0) room.passed.push(room.turn);
+        if(room.leader !== null && room.passed.length >= room.players.filter(Boolean).length - 1){
+          resolveSold(room.leader, room.currentBid); return;
+        }
+      }
+      room.turn = nextAuctionTurn(); room.turnDeadline = Date.now() + 30000; writeRoom(room); return;
+    }
     if(!localMode && mySlot !== room.turn) return;
     var pi = room.turn;
     var other = 1 - pi;
@@ -1075,8 +1207,17 @@
     wp.budget -= amount;
     wp.won.push({ name: currentLot().name, price: amount });
 
-    if(room.players[0].budget < 1 && room.players[1].budget < 1){
+    if(room.players.every(function(player){ return !player || player.budget < 1; })){
       completeListsAndEnd();
+      return;
+    }
+
+    if(isAuctionMode()){
+      room.phase = "result";
+      room.resultWinner = winnerIdx;
+      room.resultAmount = amount;
+      room.passed = [];
+      writeRoom(room);
       return;
     }
 
@@ -1099,6 +1240,18 @@
   }
 
   function completeListsAndEnd(){
+    if(isAuctionMode()){
+      var auctionPlayers = room.players.filter(Boolean);
+      var auctionIndex = 0;
+      while(room.lotIndex < room.lots.length - 1){
+        room.lotIndex++;
+        auctionPlayers[auctionIndex % auctionPlayers.length].won.push({ name: currentLot().name, price: 0 });
+        auctionIndex++;
+      }
+      room.phase = "end";
+      writeRoom(room);
+      return;
+    }
     var maxLotsPerPlayer = room.lots.length / 2;
     while(room.lotIndex < room.lots.length - 1){
       room.lotIndex++;
@@ -1114,12 +1267,13 @@
 
   function renderResult(){
     $("turnBanner").innerHTML = "";
-    renderLedger(0);
-    renderLedger(1);
+    for(var playerIndex = 0; playerIndex < 6; playerIndex++){
+      if(room.players[playerIndex]) renderLedger(playerIndex);
+    }
 
     var html = "";
     if(room.resultWinner === null){
-      html += '<p class="unsold-note">Ninguno de los dos pujó &mdash; el objeto queda sin rematar.</p>';
+      html += '<p class="unsold-note">Nadie pujó &mdash; el objeto queda sin rematar.</p>';
     } else {
       var wp = room.players[room.resultWinner];
       html += '<div class="reveal-row"><div class="reveal-side win">' +
@@ -1160,6 +1314,7 @@
         room.currentBid = 0;
         room.leader = null;
         room.passCount = 0;
+        room.passed = [];
         room.turn = room.lotIndex % 2;
         room.turnDeadline = Date.now() + 30000;
         room.phase = "bidding";
@@ -1179,6 +1334,7 @@
         value.currentBid = 0;
         value.leader = null;
         value.passCount = 0;
+        value.passed = [];
         value.turn = value.lotIndex % 2;
         value.turnDeadline = Date.now() + 30000;
         value.phase = "bidding";
@@ -1194,7 +1350,7 @@
   function renderEnd(){
     var html = "";
     var revealIndex = 0;
-    room.players.forEach(function(p){
+    room.players.filter(Boolean).forEach(function(p){
       var spent = p.startBudget - p.budget;
       var wonHtml = p.won.length
         ? '<ul class="won-list">' + p.won.map(function(w){
@@ -1234,6 +1390,7 @@
     roomCode = null; mySlot = null; room = null; localMode = false;
     $("createRoomBtn").textContent = "Crear sala";
     $("localPlayerField").style.display = "none";
+    $("maxPlayersField").style.display = "none";
     showScreen("create");
   });
 
